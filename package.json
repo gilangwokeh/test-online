@@ -9,6 +9,7 @@
   "author": "gilang romadhon",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^16.0.3",
     "mysql": "^2.18.1",
     "nodemon": "^2.0.22"
   }
