@@ -1,11 +1,16 @@
-const http = require('http');
+const express = require('express');
 const port = 3001;
 const hostname = 'localhost';
 const mysql = require('mysql');
+const cors =  require('cors');
+const body = require('body-parser');
+const app = express();
 
-const server = http.createServer(function (request,response){
-    response.end('Hello Bro')
-});
+app.use(cors());
+
+app.use(body.json());
+
+app.use("/api/route", require('./route/routing'))
 
 const connection = mysql.createConnection({
     host: 'localhost',
@@ -19,12 +24,11 @@ connection.connect((error) => {
       console.error('Error connecting to the database:', error);
       return;
     }
-  
     console.log('Connected to the database!');
   });
 
 
 
-server.listen(port,hostname,()=> {
+app.listen(port,hostname,()=> {
     console.log(`server menyala di ${hostname}:${port}`);
 })
