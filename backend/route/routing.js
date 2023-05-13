@@ -57,12 +57,12 @@ const checkUserAccess = (req, res, next) => {
   });
 };
 
-router.post("/register/user", (req, res) => {
+router.post("/register-user", (req, res) => {
   const { username, password } = req.body;
 
   // Periksa apakah pengguna dengan username yang sama sudah terdaftar
   const checkQuery = "SELECT * FROM users WHERE username = ?";
-  db.query(checkQuery, [username], (err, result) => {
+  db.query( checkQuery,[username], (err, result) => {
     if (err) {
       res.status(500).send("Error saat memeriksa pengguna");
     } else {
