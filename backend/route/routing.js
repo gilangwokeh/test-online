@@ -31,6 +31,26 @@ CREATE TABLE IF NOT EXISTS users (
   throw err;
 });
 
+db.promise().query(`
+  CREATE TABLE IF NOT EXISTS documents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description VARCHAR(255),
+    filename VARCHAR(255) NOT NULL,
+    uploader VARCHAR(255) NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`)
+  .then(() => {
+    console.log('Tabel documents telah dibuat');
+  })
+  .catch(err => {
+    throw err;
+  });
+
+// Menutup koneksi database setelah selesai
+db.end();
+
 // Konfigurasi penyimpanan file menggunakan multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -147,7 +167,7 @@ router.post("/register-admin", (req, res) => {
           } else {
             // Simpan akun admin ke database
             const insertQuery =
-              "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
+              "INSERT INTO users(username, password, role) VALUES (?, ?, ?)";
             db.query(
               insertQuery,
               [username, hashedPassword, "admin"],
@@ -166,31 +186,29 @@ router.post("/register-admin", (req, res) => {
   });
 });
 
-//  rute untuk login
-router.post("/login", (req, res) => {
+router.post('/login', (req, res) => {
   const { username, password } = req.body;
 
-
-  // Periksa kecocokan dengan data pengguna yang ada di database
-  const query = "SELECT * FROM users WHERE username = ? AND password = ?";
-  db.query(query, [username, password], (err, result) => {
-    if (err) {
-      res.status(500).send("Error saat melakukan login");
-    } else {
-      if (result.length > 0) {
-        const user = result[0];
-
-        // Periksa peran pengguna
-        if (user.role === "admin") {
-          res.status(200).send("Login admin berhasil");
-        } else {
-          res.status(200).send("Login user berhasil");
-        }
+  db.promise().query('SELECT * FROM users WHERE username = ?', [username])
+    .then(([rows]) => {
+      if (rows.length > 0) {
+        const user = rows[0];
+        bcrypt.compare(password, user.password, (err, result) => {
+          if (err) {
+            res.status(500).send('Terjadi kesalahan');
+          } else if (result) {
+            res.status(200).send('Login berhasil');
+          } else {
+            res.status(401).send('Login gagal');
+          }
+        });
       } else {
-        res.status(401).send("Username atau password salah");
+        res.status(401).send('Login gagal');
       }
-    }
-  });
+    })
+    .catch(err => {
+      res.status(500).send('Terjadi kesalahan');
+    });
 });
 
 //  rute untuk mendapatkan daftar dokumen
@@ -210,7 +228,7 @@ router.get("/documents", checkAdminAccess, checkUserAccess, (req, res) => {
 });
 
 //  rute untuk mengunggah dokumen
-router.post("/upload",checkAdminAccess,checkUserAccess, upload.single("document"),
+router.post("/upload",checkAdminAccess, upload.single("document"),
   (req, res) => {
     // Pastikan pengguna yang saat ini login adalah admin
     // Lakukan validasi lain sesuai kebutuhan
@@ -245,7 +263,7 @@ router.get("/documents/:id", checkAdminAccess, checkUserAccess, (req, res) => {
     } else {
       if (result.length > 0) {
         const file = result[0];
-        const filePath = `path/to/your/documents/${file.filename}`; // Ubah dengan lokasi file yang sesuai
+        const filePath = `path/home/documents/${file.filename}`; // Ubah dengan lokasi file yang sesuai
 
         res.download(filePath, file.filename);
       } else {
@@ -275,5 +293,4 @@ router.delete("/documents/:id", checkAdminAccess, (req, res) => {
   });
 });
 
-// Export router agar bisa digunakan di file lain
 module.exports = router;

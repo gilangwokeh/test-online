@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sistem Manajemen Dokumen</title>
+  <link rel="stylesheet" type="text/css" href="./style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Selamat datang di Sistem Manajemen Dokumen</h1>
+    <form id="loginForm">
+      <label for="username">Username:</label>
+      <input type="text" id="username" name="username" required>
+      <label for="password">Password:</label>
+      <input type="password" id="password" name="password" required>
+      <button type="submit">Login</button>
+    </form>
+    <div id="documentList" class="hidden">
+      <h2>Daftar Dokumen</h2>
+      <ul id="list">
+        <!-- Daftar dokumen akan ditampilkan di sini -->
+      </ul>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
