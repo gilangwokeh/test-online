@@ -6,14 +6,18 @@
 </head>
 <body>
   <div class="container">
-    <h1>Selamat datang di Sistem Manajemen Dokumen</h1>
+    <h1>Selamat datang di Sistem Manajemen Dokument</h1>
     <form id="loginForm">
-      <label for="username">Username:</label>
+      <label for="username">Username :</label>
       <input type="text" id="username" name="username" required>
-      <label for="password">Password:</label>
+      <label for="password">Password  :</label>
       <input type="password" id="password" name="password" required>
-      <button type="submit">Login</button>
+      <button class="btn" type="submit">Login</button>
     </form>
+    <a href="./pendaftaran-user.html">Lanjut ke Halaman Pendaftaran user</a>
+    <br>
+    <br>
+    <a href="./pendaftaran-admin.html">Lanjut ke Halaman Pendaftaran admin</a>
     <div id="documentList" class="hidden">
       <h2>Daftar Dokumen</h2>
       <ul id="list">
@@ -21,6 +25,6 @@
       </ul>
     </div>
   </div>
-  <script src="script.js"></script>
+  <script src="./index.js"></script>
 </body>
 </html>
