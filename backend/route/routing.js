@@ -1,6 +1,35 @@
 const express = require("express");
-const router = express.Router();
-const multer = require("multer");
+const router  = express.Router();
+const multer  = require("multer");
+const bcrypt  = require('bcrypt');
+const mysql   = require('mysql2');
+
+const db = mysql.createConnection({
+  host: "localhost",
+  user: "gilang",
+  password: "password123",
+  database: "test",
+});
+
+db.connect((err) => {
+  if (err) {
+    throw err;
+  }
+  console.log('Terhubung ke database MySQL');
+});
+
+db.promise().query(`
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(255) NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  role ENUM('admin', 'user') NOT NULL
+  )
+`).then(() => {
+  console.log('Tabel admins telah dibuat');
+}).catch((err) => {
+  throw err;
+});
 
 // Konfigurasi penyimpanan file menggunakan multer
 const storage = multer.diskStorage({
@@ -16,6 +45,7 @@ const upload = multer({ storage: storage });
 
 const checkAdminAccess = (req, res, next) => {
   const userId = req.user.id;
+
 
   // Periksa peran pengguna dalam database
   const query = "SELECT role FROM users WHERE id = ?";
@@ -42,6 +72,7 @@ const checkUserAccess = (req, res, next) => {
   const userId = req.user.id;
   const fileId = req.params.id;
 
+
   // Periksa apakah pengguna memiliki akses ke file dalam database
   const query = "SELECT * FROM files WHERE id = ? AND uploaded_by = ?";
   db.query(query, [fileId, userId], (err, result) => {
@@ -59,6 +90,7 @@ const checkUserAccess = (req, res, next) => {
 
 router.post("/register-user", (req, res) => {
   const { username, password } = req.body;
+
 
   // Periksa apakah pengguna dengan username yang sama sudah terdaftar
   const checkQuery = "SELECT * FROM users WHERE username = ?";
@@ -95,8 +127,9 @@ router.post("/register-user", (req, res) => {
   });
 });
 
-router.post("/register/admin", (req, res) => {
+router.post("/register-admin", (req, res) => {
   const { username, password } = req.body;
+
 
   // Periksa apakah pengguna dengan username yang sama sudah terdaftar
   const checkQuery = "SELECT * FROM users WHERE username = ?";
@@ -133,9 +166,10 @@ router.post("/register/admin", (req, res) => {
   });
 });
 
-// Contoh definisi rute untuk login
+//  rute untuk login
 router.post("/login", (req, res) => {
   const { username, password } = req.body;
+
 
   // Periksa kecocokan dengan data pengguna yang ada di database
   const query = "SELECT * FROM users WHERE username = ? AND password = ?";
@@ -159,9 +193,11 @@ router.post("/login", (req, res) => {
   });
 });
 
-// Contoh definisi rute untuk mendapatkan daftar dokumen
+//  rute untuk mendapatkan daftar dokumen
 router.get("/documents", checkAdminAccess, checkUserAccess, (req, res) => {
   // Dapatkan daftar file dokumen dari database
+
+
   const query =
     "SELECT title, description, uploader_name, upload_date FROM documents";
   db.query(query, (err, result) => {
@@ -173,7 +209,7 @@ router.get("/documents", checkAdminAccess, checkUserAccess, (req, res) => {
   });
 });
 
-// Contoh definisi rute untuk mengunggah dokumen
+//  rute untuk mengunggah dokumen
 router.post("/upload",checkAdminAccess,checkUserAccess, upload.single("document"),
   (req, res) => {
     // Pastikan pengguna yang saat ini login adalah admin
@@ -181,6 +217,7 @@ router.post("/upload",checkAdminAccess,checkUserAccess, upload.single("document"
 
     // Dapatkan informasi file yang diunggah dari req.file
     const { originalname, mimetype, size } = req.file;
+  
 
     // Simpan informasi file ke dalam database
     const query =
@@ -195,9 +232,10 @@ router.post("/upload",checkAdminAccess,checkUserAccess, upload.single("document"
   }
 );
 
-// Contoh definisi rute untuk mengunduh dokumen
+//  rute untuk mengunduh dokumen
 router.get("/documents/:id", checkAdminAccess, checkUserAccess, (req, res) => {
   const fileId = req.params.id;
+
 
   // Dapatkan informasi file dari database berdasarkan ID
   const query = "SELECT * FROM documents WHERE id = ?";
@@ -217,9 +255,10 @@ router.get("/documents/:id", checkAdminAccess, checkUserAccess, (req, res) => {
   });
 });
 
-// Contoh definisi rute untuk menghapus dokumen
+//  rute untuk menghapus dokumen
 router.delete("/documents/:id", checkAdminAccess, (req, res) => {
   const fileId = req.params.id;
+
 
   // Hapus file dokumen dari database berdasarkan ID
   const query = "DELETE FROM documents WHERE id = ?";

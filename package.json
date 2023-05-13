@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "mysql2": "^3.3.1"
+  }
+}
