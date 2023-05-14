@@ -14,7 +14,9 @@
         method="POST"
         enctype="multipart/form-data"
       >
-        <input type="text" placeholder="judul nama" name="filename" required />
+        <input type="text" placeholder="judul" name="filename" required />
+        <input type="text" placeholder="deskripsi" name="deskripsi" required />
+        <input type="text" placeholder="nama pengunggah" name="nama_pengunggah" required />
         <input type="file" name="file" required />
         <br />
         <input type="submit" value="Upload" />
@@ -41,7 +43,7 @@
             alert("File uploaded successfully");
           })
           .catch((error) => {
-            console.error(error);
+            console.error(error.data);
             alert("Terjadi kesalahan saat mengupload file");
           });
       });

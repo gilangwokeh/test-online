@@ -42,13 +42,15 @@ db.promise()
     `CREATE TABLE IF NOT EXISTS files (
     id INT AUTO_INCREMENT PRIMARY KEY,
     filename VARCHAR(255),
+    deskripsi VARCHAR(255),
+    nama_pengunggah VARCHAR(255),
     content MEDIUMBLOB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
 `
   )
   .then(() => {
-    console.log("Tabel admins dan users telah dibuat");
+    console.log("Tabel admins telah dibuat");
   })
   .catch((err) => {
     throw err;
@@ -216,13 +218,15 @@ router.get("/documents", checkAdminAccess, checkUserAccess, (req, res) => {
 
 router.post("/upload", upload.single("file"), (req, res) => {
   const { originalname, path } = req.file;
+  const { filename, deskripsi, nama_pengunggah } = req.body;
+
 
   // Baca konten file
   const content = fs.readFileSync(path);
 
   // Simpan konten file ke dalam database
-  const sql = "INSERT INTO files (filename, content) VALUES (?, ?)";
-  connection.query(sql, [originalname, content], (error, result) => {
+  const sql = "INSERT INTO files (filename, deskripsi, nama_pengunggah, content) VALUES (?, ?, ?, ?)";
+  db.query(sql, [originalname,filename, deskripsi, nama_pengunggah, content], (error, result) => {
     if (error) {
       console.error("Gagal menyimpan file ke database:", error);
       res.status(500).json({ error: "Gagal menyimpan file ke database" });
