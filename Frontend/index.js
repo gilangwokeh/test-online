@@ -1,58 +1,25 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const loginForm = document.getElementById("loginForm");
-  const documentList = document.getElementById("documentList");
-  const list = document.getElementById("list");
+const loginForm = document.getElementById('loginForm');
 
-  // Fungsi untuk menampilkan daftar dokumen
-  function showDocumentList(documents) {
-    list.innerHTML = "";
-    documents.forEach((doc) => {
-      const listItem = document.createElement("li");
-      const title = document.createElement("span");
-      title.textContent = doc.title;
-      listItem.appendChild(title);
-      list.appendChild(listItem);
-    });
-  }
+loginForm.addEventListener('submit', (e) => {
+  e.preventDefault();
 
-  // Fungsi untuk mengambil daftar dokumen dari server
-  function getDocuments() {
-    fetch("/documents")
-      .then((response) => response.json())
-      .then((data) => {
-        showDocumentList(data.documents);
-      })
-      .catch((error) => console.log(error));
-  }
+  const username = loginForm.username.value;
+  const password = loginForm.password.value;
 
-  // Fungsi untuk menampilkan halaman setelah login sukses
-  function showLoggedInPage() {
-    loginForm.classList.add("hidden");
-    documentList.classList.remove("hidden");
-    getDocuments();
-  }
-
-  // Submit form login
-  loginForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
-
-    fetch("http://localhost:5001/api/route/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ username, password }),
+  axios.post('http://localhost:5001/api/route/login', { username, password })
+    .then((response) => {
+      console.log(response.data);
+      if (response.data.role === 'admin') {
+        window.location.href = 'http://127.0.0.1:3000/Frontend/HalamanAdmin.html';
+      } else if ( response.data.role === 'user') {
+        window.location.href = 'http://127.0.0.1:3000/Frontend/HalamanUser.html';
+      }else {
+        alert('pengguna tidak di temukan role nya')
+        window.location.href = 'http://127.0.0.1:3000/Frontend/index.html';
+      }
     })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.success) {
-          showLoggedInPage();
-        } else {
-          alert("Login gagal");
-        }
-      })
-      .catch((error) => console.log(error));
-  });
+    .catch((error) => {
+      console.error(error);
+      alert('salah username atau Password');
+    });
 });

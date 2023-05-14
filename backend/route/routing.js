@@ -1,8 +1,9 @@
 const express = require("express");
-const router  = express.Router();
-const multer  = require("multer");
-const bcrypt  = require('bcrypt');
-const mysql   = require('mysql2');
+const router = express.Router();
+const multer = require("multer");
+const bcrypt = require("bcrypt");
+const mysql = require("mysql2");
+const fs = require("fs");
 
 const db = mysql.createConnection({
   host: "localhost",
@@ -15,59 +16,49 @@ db.connect((err) => {
   if (err) {
     throw err;
   }
-  console.log('Terhubung ke database MySQL');
+  console.log("Terhubung ke database MySQL");
 });
 
-db.promise().query(`
+db.promise()
+  .query(
+    `
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(255) NOT NULL,
   password VARCHAR(255) NOT NULL,
   role ENUM('admin', 'user') NOT NULL
   )
-`).then(() => {
-  console.log('Tabel admins telah dibuat');
-}).catch((err) => {
-  throw err;
-});
-
-db.promise().query(`
-  CREATE TABLE IF NOT EXISTS documents (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    description VARCHAR(255),
-    filename VARCHAR(255) NOT NULL,
-    uploader VARCHAR(255) NOT NULL,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+`
   )
-`)
   .then(() => {
-    console.log('Tabel documents telah dibuat');
+    console.log("Tabel admins dan users telah dibuat");
   })
-  .catch(err => {
+  .catch((err) => {
     throw err;
   });
 
-// Menutup koneksi database setelah selesai
-db.end();
+db.promise()
+  .query(
+    `CREATE TABLE IF NOT EXISTS files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    filename VARCHAR(255),
+    content MEDIUMBLOB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`
+  )
+  .then(() => {
+    console.log("Tabel admins dan users telah dibuat");
+  })
+  .catch((err) => {
+    throw err;
+  });
 
-// Konfigurasi penyimpanan file menggunakan multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  },
-});
-
-const upload = multer({ storage: storage });
+const upload = multer({ dest: "uploads/" });
 
 const checkAdminAccess = (req, res, next) => {
   const userId = req.user.id;
 
-
-  // Periksa peran pengguna dalam database
   const query = "SELECT role FROM users WHERE id = ?";
   db.query(query, [userId], (err, result) => {
     if (err) {
@@ -92,7 +83,6 @@ const checkUserAccess = (req, res, next) => {
   const userId = req.user.id;
   const fileId = req.params.id;
 
-
   // Periksa apakah pengguna memiliki akses ke file dalam database
   const query = "SELECT * FROM files WHERE id = ? AND uploaded_by = ?";
   db.query(query, [fileId, userId], (err, result) => {
@@ -108,25 +98,21 @@ const checkUserAccess = (req, res, next) => {
   });
 };
 
-router.post("/register-user", (req, res) => {
+router.post("/register/user", (req, res) => {
   const { username, password } = req.body;
 
-
-  // Periksa apakah pengguna dengan username yang sama sudah terdaftar
   const checkQuery = "SELECT * FROM users WHERE username = ?";
-  db.query( checkQuery,[username], (err, result) => {
+  db.query(checkQuery, [username], (err, result) => {
     if (err) {
-      res.status(500).send("Error saat memeriksa pengguna");
+      res.status(500).send("Error saat memeriksa pengguna  " + err);
     } else {
       if (result.length > 0) {
         res.status(400).send("Username sudah digunakan");
       } else {
-        // Enkripsi password sebelum disimpan
         bcrypt.hash(password, 10, (err, hashedPassword) => {
           if (err) {
             res.status(500).send("Error saat mengenkripsi password");
           } else {
-            // Simpan akun pengguna ke database
             const insertQuery =
               "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
             db.query(
@@ -147,9 +133,8 @@ router.post("/register-user", (req, res) => {
   });
 });
 
-router.post("/register-admin", (req, res) => {
+router.post("/register/admin", (req, res) => {
   const { username, password } = req.body;
-
 
   // Periksa apakah pengguna dengan username yang sama sudah terdaftar
   const checkQuery = "SELECT * FROM users WHERE username = ?";
@@ -186,36 +171,38 @@ router.post("/register-admin", (req, res) => {
   });
 });
 
-router.post('/login', (req, res) => {
+router.post("/login", (req, res) => {
   const { username, password } = req.body;
 
-  db.promise().query('SELECT * FROM users WHERE username = ?', [username])
-    .then(([rows]) => {
-      if (rows.length > 0) {
-        const user = rows[0];
-        bcrypt.compare(password, user.password, (err, result) => {
-          if (err) {
-            res.status(500).send('Terjadi kesalahan');
-          } else if (result) {
-            res.status(200).send('Login berhasil');
-          } else {
-            res.status(401).send('Login gagal');
-          }
-        });
-      } else {
-        res.status(401).send('Login gagal');
-      }
-    })
-    .catch(err => {
-      res.status(500).send('Terjadi kesalahan');
-    });
+  // Cek data login di database
+  const checkLoginQuery = `SELECT * FROM users WHERE username = '${username}'`;
+  db.query(checkLoginQuery, (err, results) => {
+    if (err) {
+      throw err;
+    }
+    if (results.length > 0) {
+      const user = results[0];
+
+      // Bandingkan password yang diinput dengan hash password di database
+      bcrypt.compare(password, user.password, (err, isMatch) => {
+        if (err) {
+          throw err;
+        }
+        if (isMatch) {
+          // Login berhasil, kirim data peran ke frontend
+          const role = user.role;
+          res.status(200).json({ message: "Login berhasil", role });
+        } else {
+          res.status(401).json({ message: "Invalid username or password" });
+        }
+      });
+    } else {
+      res.status(401).json({ message: "Invalid username or password" });
+    }
+  });
 });
 
-//  rute untuk mendapatkan daftar dokumen
 router.get("/documents", checkAdminAccess, checkUserAccess, (req, res) => {
-  // Dapatkan daftar file dokumen dari database
-
-
   const query =
     "SELECT title, description, uploader_name, upload_date FROM documents";
   db.query(query, (err, result) => {
@@ -227,33 +214,35 @@ router.get("/documents", checkAdminAccess, checkUserAccess, (req, res) => {
   });
 });
 
-//  rute untuk mengunggah dokumen
-router.post("/upload",checkAdminAccess, upload.single("document"),
-  (req, res) => {
-    // Pastikan pengguna yang saat ini login adalah admin
-    // Lakukan validasi lain sesuai kebutuhan
+router.post("/upload", upload.single("file"), (req, res) => {
+  const { originalname, path } = req.file;
 
-    // Dapatkan informasi file yang diunggah dari req.file
-    const { originalname, mimetype, size } = req.file;
-  
+  // Baca konten file
+  const content = fs.readFileSync(path);
 
-    // Simpan informasi file ke dalam database
-    const query =
-      "INSERT INTO documents (filename, mimetype, size) VALUES (?, ?, ?)";
-    db.query(query, [originalname, mimetype, size], (err, result) => {
-      if (err) {
-        res.status(500).send("Error saat mengunggah file");
-      } else {
-        res.status(200).send("File berhasil diunggah");
+  // Simpan konten file ke dalam database
+  const sql = "INSERT INTO files (filename, content) VALUES (?, ?)";
+  connection.query(sql, [originalname, content], (error, result) => {
+    if (error) {
+      console.error("Gagal menyimpan file ke database:", error);
+      res.status(500).json({ error: "Gagal menyimpan file ke database" });
+      if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
       }
-    });
-  }
-);
+    } else {
+      console.log("File berhasil disimpan ke database:", result);
+      res.status(200).json({ message: "File berhasil disimpan ke database" });
+    }
+  });
+
+  // Hapus file yang diunggah setelah tersimpan di database
+  fs.unlinkSync(path);
+});
 
 //  rute untuk mengunduh dokumen
 router.get("/documents/:id", checkAdminAccess, checkUserAccess, (req, res) => {
   const fileId = req.params.id;
-
 
   // Dapatkan informasi file dari database berdasarkan ID
   const query = "SELECT * FROM documents WHERE id = ?";
@@ -276,7 +265,6 @@ router.get("/documents/:id", checkAdminAccess, checkUserAccess, (req, res) => {
 //  rute untuk menghapus dokumen
 router.delete("/documents/:id", checkAdminAccess, (req, res) => {
   const fileId = req.params.id;
-
 
   // Hapus file dokumen dari database berdasarkan ID
   const query = "DELETE FROM documents WHERE id = ?";
