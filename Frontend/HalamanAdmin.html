@@ -8,32 +8,50 @@
     <div class="container">
       <h2>Welcome, Admin!</h2>
       <h2>Upload File</h2>
-      <form
-        id="uploadForm"
-        action="/upload"
-        method="POST"
-        enctype="multipart/form-data"
-      >
+      <form id="uploadForm" method="POST" enctype="multipart/form-data">
+        <h2>Judul :</h2>
         <input type="text" placeholder="judul" name="filename" required />
+        <h2>deskripsi :</h2>
         <input type="text" placeholder="deskripsi" name="deskripsi" required />
-        <input type="text" placeholder="nama pengunggah" name="nama_pengunggah" required />
+        <h2>nama pengunggah :</h2>
+        <input
+          type="text"
+          placeholder="nama pengunggah"
+          name="nama_pengunggah"
+          required
+        />
         <input type="file" name="file" required />
         <br />
         <input type="submit" value="Upload" />
       </form>
       <h2>Daftar File Dokument</h2>
+      <table id="file-list">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Judul</th>
+            <th>Deskripsi</th>
+            <th>Nama Pengunggah</th>
+            <th>Tanggal Unggah</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Data file akan ditambahkan secara dinamis melalui JavaScript -->
+        </tbody>
+      </table>
+      <br />
       <a href="./index.html">Logout</a>
     </div>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <script>
       const uploadForm = document.getElementById("uploadForm");
 
-      uploadForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-
+      uploadForm.addEventListener("submit", () => {
         const formData = new FormData(uploadForm);
 
-        axios.post("http://localhost:5001/api/route/upload", formData, {
+        axios
+          .post("http://localhost:5001/api/route/upload", formData, {
             headers: {
               "Content-Type": "multipart/form-data",
             },
@@ -47,6 +65,83 @@
             alert("Terjadi kesalahan saat mengupload file");
           });
       });
+    </script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Ambil referensi elemen tabel
+
+        let fileList = document.getElementById("file-list");
+
+        // Ambil daftar file dari server
+        fetch("http://localhost:5001/api/route/files")
+          .then((response) => response.json())
+          .then((files) => {
+            files.map((file) => {
+              let row = fileList.insertRow();
+
+              let idCell = row.insertCell();
+              idCell.textContent = file.id;
+
+              let namaFileCell = row.insertCell();
+              namaFileCell.textContent = file.filename;
+
+              let deskripsiCell = row.insertCell();
+              deskripsiCell.textContent = file.deskripsi;
+
+              let namaPengunggahCell = row.insertCell();
+              namaPengunggahCell.textContent = file.nama_pengunggah;
+
+              let timestampCell = row.insertCell();
+              timestampCell.textContent = file.created_at;
+
+              let aksiCell = row.insertCell();
+              let downloadLink = document.createElement("a");
+              downloadLink.href = "#";
+              downloadLink.textContent = "Unduh";
+              aksiCell.appendChild(downloadLink);
+              downloadLink.addEventListener("click", function () {
+                downloadFile(file.id);
+              });
+              let deleteButton = document.createElement("button");
+              deleteButton.textContent = "Hapus";
+              deleteButton.addEventListener("click", function () {
+                deleteFile(file.id);
+              });
+              aksiCell.appendChild(deleteButton);
+            });
+          })
+          .catch((error) => {
+            console.log("Error:", error);
+          });
+      });
+
+      function downloadFile(fileId) {
+        if (confirm("Anda yakin download file ini?")) {
+          axios
+            .get("http://localhost:5001/api/route/download/" + fileId)
+            .then((result) => {
+              alert("File Berhasil di download");
+              location.reload();
+            })
+            .catch((error) => {
+              console.log("Error:", error);
+            });
+        }
+      }
+
+      function deleteFile(fileId) {
+        if (confirm("Anda yakin ingin menghapus file ini?")) {
+          axios
+            .delete("http://localhost:5001/api/route/delete/files/" + fileId)
+            .then((result) => {
+              alert("File Berhasil di hapus");
+              location.reload();
+            })
+            .catch((error) => {
+              console.log("Error:", error);
+            });
+        }
+      }
     </script>
   </body>
 </html>

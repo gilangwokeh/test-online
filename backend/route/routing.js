@@ -4,6 +4,7 @@ const multer = require("multer");
 const bcrypt = require("bcrypt");
 const mysql = require("mysql2");
 const fs = require("fs");
+const path = require("path");
 
 const db = mysql.createConnection({
   host: "localhost",
@@ -56,49 +57,31 @@ db.promise()
     throw err;
   });
 
-const upload = multer({ dest: "uploads/" });
+  const query = 'SELECT content FROM files';
+db.query(query, (error, results) => {
+  if (error) {
+    console.log(error);
+    return;
+  }
 
-const checkAdminAccess = (req, res, next) => {
-  const userId = req.user.id;
-
-  const query = "SELECT role FROM users WHERE id = ?";
-  db.query(query, [userId], (err, result) => {
-    if (err) {
-      res.status(500).send("Error saat memeriksa peran pengguna");
-    } else {
-      if (result.length > 0) {
-        const role = result[0].role;
-
-        if (role === "admin") {
-          next();
-        } else {
-          res.status(403).send("Akses ditolak");
-        }
-      } else {
-        res.status(401).send("Pengguna tidak ditemukan");
-      }
-    }
+  results.forEach((row) => {
+    const content = row.path;
+    console.log('Path:', content);
   });
-};
+});
 
-const checkUserAccess = (req, res, next) => {
-  const userId = req.user.id;
-  const fileId = req.params.id;
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const fileExtension = path.extname(file.originalname);
+    cb(null, file.fieldname + "-" + uniqueSuffix + fileExtension);
+  },
+});
 
-  // Periksa apakah pengguna memiliki akses ke file dalam database
-  const query = "SELECT * FROM files WHERE id = ? AND uploaded_by = ?";
-  db.query(query, [fileId, userId], (err, result) => {
-    if (err) {
-      res.status(500).send("Error saat memeriksa akses file");
-    } else {
-      if (result.length > 0) {
-        next();
-      } else {
-        res.status(403).send("Akses ditolak");
-      }
-    }
-  });
-};
+const upload = multer({ storage: storage });
 
 router.post("/register/user", (req, res) => {
   const { username, password } = req.body;
@@ -138,7 +121,6 @@ router.post("/register/user", (req, res) => {
 router.post("/register/admin", (req, res) => {
   const { username, password } = req.body;
 
-  // Periksa apakah pengguna dengan username yang sama sudah terdaftar
   const checkQuery = "SELECT * FROM users WHERE username = ?";
   db.query(checkQuery, [username], (err, result) => {
     if (err) {
@@ -147,12 +129,10 @@ router.post("/register/admin", (req, res) => {
       if (result.length > 0) {
         res.status(400).send("Username sudah digunakan");
       } else {
-        // Enkripsi password sebelum disimpan
         bcrypt.hash(password, 10, (err, hashedPassword) => {
           if (err) {
             res.status(500).send("Error saat mengenkripsi password");
           } else {
-            // Simpan akun admin ke database
             const insertQuery =
               "INSERT INTO users(username, password, role) VALUES (?, ?, ?)";
             db.query(
@@ -176,7 +156,6 @@ router.post("/register/admin", (req, res) => {
 router.post("/login", (req, res) => {
   const { username, password } = req.body;
 
-  // Cek data login di database
   const checkLoginQuery = `SELECT * FROM users WHERE username = '${username}'`;
   db.query(checkLoginQuery, (err, results) => {
     if (err) {
@@ -185,13 +164,11 @@ router.post("/login", (req, res) => {
     if (results.length > 0) {
       const user = results[0];
 
-      // Bandingkan password yang diinput dengan hash password di database
       bcrypt.compare(password, user.password, (err, isMatch) => {
         if (err) {
           throw err;
         }
         if (isMatch) {
-          // Login berhasil, kirim data peran ke frontend
           const role = user.role;
           res.status(200).json({ message: "Login berhasil", role });
         } else {
@@ -204,74 +181,96 @@ router.post("/login", (req, res) => {
   });
 });
 
-router.get("/documents", checkAdminAccess, checkUserAccess, (req, res) => {
-  const query =
-    "SELECT title, description, uploader_name, upload_date FROM documents";
-  db.query(query, (err, result) => {
+router.get("/files", (req, res) => {
+  const query = "SELECT * FROM files";
+
+  db.query(query, (err, results) => {
     if (err) {
-      res.status(500).send("Error saat mengambil daftar file dokumen");
+      console.error("Error:", err);
+      res
+        .status(500)
+        .json({ error: "Terjadi kesalahan saat mengambil daftar file" });
+      return;
     } else {
-      res.status(200).json(result);
+      res.json(results);
     }
   });
 });
 
 router.post("/upload", upload.single("file"), (req, res) => {
-  const { originalname, path } = req.file;
-  const { filename, deskripsi, nama_pengunggah } = req.body;
+  const { filename, path } = req.file;
+  const { deskripsi, nama_pengunggah } = req.body;
 
-
-  // Baca konten file
   const content = fs.readFileSync(path);
-
-  // Simpan konten file ke dalam database
-  const sql = "INSERT INTO files (filename, deskripsi, nama_pengunggah, content) VALUES (?, ?, ?, ?)";
-  db.query(sql, [originalname,filename, deskripsi, nama_pengunggah, content], (error, result) => {
-    if (error) {
-      console.error("Gagal menyimpan file ke database:", error);
-      res.status(500).json({ error: "Gagal menyimpan file ke database" });
-      if (!req.file) {
-        res.status(400).json({ error: 'No file uploaded' });
-        return;
+  const sql =
+    "INSERT INTO files (filename, deskripsi, nama_pengunggah, content) VALUES (?, ?, ?, ?)";
+  db.query(
+    sql,
+    [ filename, deskripsi, nama_pengunggah, content],
+    (error, result) => {
+      if (error) {
+        console.error("Gagal menyimpan file ke database:", error);
+        res.status(500).json({ error: "Gagal menyimpan file ke database" });
+        if (!req.file) {
+          res.status(400).json({ error: "No file uploaded" });
+          return;
+        }
+      } else {
+        console.log("File berhasil disimpan ke database:", result);
+        res.status(200).json({ message: "File berhasil disimpan ke database" });
       }
-    } else {
-      console.log("File berhasil disimpan ke database:", result);
-      res.status(200).json({ message: "File berhasil disimpan ke database" });
     }
-  });
+  );
 
   // Hapus file yang diunggah setelah tersimpan di database
   fs.unlinkSync(path);
 });
 
-//  rute untuk mengunduh dokumen
-router.get("/documents/:id", checkAdminAccess, checkUserAccess, (req, res) => {
+router.get("/download/:id", (req, res) => {
   const fileId = req.params.id;
 
-  // Dapatkan informasi file dari database berdasarkan ID
-  const query = "SELECT * FROM documents WHERE id = ?";
-  db.query(query, [fileId], (err, result) => {
+  // Query ke database untuk mendapatkan informasi file
+  const query = `SELECT filename, content FROM files WHERE id = ${fileId}`;
+  db.query(query, (err, results) => {
     if (err) {
-      res.status(500).send("Error saat mengambil informasi file");
-    } else {
-      if (result.length > 0) {
-        const file = result[0];
-        const filePath = `path/home/documents/${file.filename}`; // Ubah dengan lokasi file yang sesuai
-
-        res.download(filePath, file.filename);
-      } else {
-        res.status(404).send("File tidak ditemukan");
-      }
+      console.log(err);
+      return res.status(500).send("Internal Server Error");
     }
+
+    if (results.length === 0) {
+      return res.status(404).send("File not found");
+    }
+
+    const file = results[0];
+    const filePath = file.path;
+
+    if (!filePath) {
+      return res.status(500).send("File path not found");
+    }
+
+    // Membaca file dari sistem file
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        console.log(err);
+        return res.status(500).send("Internal Server Error");
+      }
+
+      // Mengirimkan file sebagai respons
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${file.filename}"`
+      );
+      res.send(data);
+    });
   });
 });
 
 //  rute untuk menghapus dokumen
-router.delete("/documents/:id", checkAdminAccess, (req, res) => {
+router.delete("/delete/files/:id", (req, res) => {
   const fileId = req.params.id;
 
   // Hapus file dokumen dari database berdasarkan ID
-  const query = "DELETE FROM documents WHERE id = ?";
+  const query = "DELETE FROM files WHERE id = ?";
   db.query(query, [fileId], (err, result) => {
     if (err) {
       res.status(500).send("Error saat menghapus file dokumen");

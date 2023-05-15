@@ -8,7 +8,63 @@
     <div class="container">
       <h2>Welcome, User!</h2>
       <h2>Daftar File Document</h2>
+      <table id="file-list">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Judul</th>
+            <th>Deskripsi</th>
+            <th>Nama Pengunggah</th>
+            <th>Tanggal Unggah</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Data file akan ditambahkan secara dinamis melalui JavaScript -->
+        </tbody>
+      </table>
+      <br />
       <a href="./index.html">Logout</a>
     </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Ambil referensi elemen tabel
+        var fileList = document.getElementById("file-list");
+
+        // Ambil daftar file dari server
+        fetch("http://localhost:5001/api/route/files")
+          .then((response) => response.json())
+          .then((files) => {
+            // Tambahkan baris dalam tabel untuk setiap file
+            files.map((file) => {
+              var row = fileList.insertRow();
+
+              var idCell = row.insertCell();
+              idCell.textContent = file.id;
+
+              var namaFileCell = row.insertCell();
+              namaFileCell.textContent = file.filename;
+
+              var deskripsiCell = row.insertCell();
+              deskripsiCell.textContent = file.deskripsi;
+
+              var namaPengunggahCell = row.insertCell();
+              namaPengunggahCell.textContent = file.nama_pengunggah;
+
+              var timestampCell = row.insertCell();
+              timestampCell.textContent = file.created_at;
+
+              var aksiCell = row.insertCell();
+              var downloadLink = document.createElement("a");
+              downloadLink.href = "/download/" + file.id;
+              downloadLink.textContent = "Unduh";
+              aksiCell.appendChild(downloadLink);
+            });
+          })
+          .catch((error) => {
+            console.log("Error:", error);
+          });
+      });
+    </script>
   </body>
 </html>
