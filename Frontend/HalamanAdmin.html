@@ -6,7 +6,7 @@
   </head>
   <body>
     <div class="container">
-      <h2>Welcome, Admin!</h2>
+      <h2 style="text-align: center;">Welcome, Admin!</h2>
       <h2>Upload File</h2>
       <form id="uploadForm" method="POST" enctype="multipart/form-data">
         <h2>Judul :</h2>
@@ -125,6 +125,8 @@
             })
             .catch((error) => {
               console.log("Error:", error);
+              alert("File Kosong  ");
+
             });
         }
       }

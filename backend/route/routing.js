@@ -3,7 +3,6 @@ const router = express.Router();
 const multer = require("multer");
 const bcrypt = require("bcrypt");
 const mysql = require("mysql2");
-const fs = require("fs");
 const path = require("path");
 
 const db = mysql.createConnection({
@@ -57,31 +56,16 @@ db.promise()
     throw err;
   });
 
-  const query = 'SELECT content FROM files';
-db.query(query, (error, results) => {
-  if (error) {
-    console.log(error);
-    return;
-  }
-
-  results.forEach((row) => {
-    const content = row.path;
-    console.log('Path:', content);
-  });
-});
-
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: (req, file, cb) => {
     cb(null, "uploads/");
   },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const fileExtension = path.extname(file.originalname);
-    cb(null, file.fieldname + "-" + uniqueSuffix + fileExtension);
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ storage:storage });
 
 router.post("/register/user", (req, res) => {
   const { username, password } = req.body;
@@ -198,78 +182,58 @@ router.get("/files", (req, res) => {
 });
 
 router.post("/upload", upload.single("file"), (req, res) => {
-  const { filename, path } = req.file;
-  const { deskripsi, nama_pengunggah } = req.body;
+  if (!req.file) {
+    res.status(400).json({ message: "No file uploaded" });
+  } else {
+    const { originalname, filename, path } = req.file;
+    const { deskripsi, nama_pengunggah } = req.body;
 
-  const content = fs.readFileSync(path);
-  const sql =
-    "INSERT INTO files (filename, deskripsi, nama_pengunggah, content) VALUES (?, ?, ?, ?)";
-  db.query(
-    sql,
-    [ filename, deskripsi, nama_pengunggah, content],
-    (error, result) => {
-      if (error) {
-        console.error("Gagal menyimpan file ke database:", error);
-        res.status(500).json({ error: "Gagal menyimpan file ke database" });
-        if (!req.file) {
-          res.status(400).json({ error: "No file uploaded" });
-          return;
-        }
+    const query =
+      "INSERT INTO files (filename, deskripsi, nama_pengunggah ,content) VALUES (?, ?, ?,?)";
+    db.query(query, [originalname, filename,deskripsi, nama_pengunggah , path], (err, result) => {
+      if (err) {
+        console.error("Error saving file to MySQL:", err);
+        res.status(500).json({ message: "Failed to save file to MySQL" });
       } else {
-        console.log("File berhasil disimpan ke database:", result);
-        res.status(200).json({ message: "File berhasil disimpan ke database" });
+        res.status(200).json({ message: "File uploaded successfully" });
       }
-    }
-  );
-
-  // Hapus file yang diunggah setelah tersimpan di database
-  fs.unlinkSync(path);
+    });
+  }
 });
 
-router.get("/download/:id", (req, res) => {
+router.get('/download/:id', (req, res) => {
   const fileId = req.params.id;
 
-  // Query ke database untuk mendapatkan informasi file
-  const query = `SELECT filename, content FROM files WHERE id = ${fileId}`;
-  db.query(query, (err, results) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).send("Internal Server Error");
+  if (!fileId) {
+    return res.status(400).send('ID file tidak diberikan.');
+  }
+
+  const query = 'SELECT * FROM files WHERE id = ?';
+  db.query(query, [fileId], (error, results) => {
+    if (error) {
+      console.error('Error saat menjalankan query: ' + error.stack);
+      return res.status(500).send('Terjadi kesalahan saat mengambil informasi file.');
     }
 
     if (results.length === 0) {
-      return res.status(404).send("File not found");
+      return res.status(404).send('File tidak ditemukan.');
     }
 
     const file = results[0];
-    const filePath = file.path;
+    const filePath = __dirname + '/uploads/' + file.filename;
 
-    if (!filePath) {
-      return res.status(500).send("File path not found");
-    }
-
-    // Membaca file dari sistem file
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        console.log(err);
-        return res.status(500).send("Internal Server Error");
+    res.download(filePath, file.originalname, (error) => {
+      if (error) {
+        console.log('Gagal mengirimkan file:', error);
+        res.status(500).send('Terjadi kesalahan saat mengunduh file.' + error);
       }
-
-      // Mengirimkan file sebagai respons
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${file.filename}"`
-      );
-      res.send(data);
     });
   });
 });
 
-//  rute untuk menghapus dokumen
 router.delete("/delete/files/:id", (req, res) => {
   const fileId = req.params.id;
 
-  // Hapus file dokumen dari database berdasarkan ID
   const query = "DELETE FROM files WHERE id = ?";
   db.query(query, [fileId], (err, result) => {
     if (err) {
